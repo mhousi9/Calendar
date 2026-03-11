@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Směnový Kalendář</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f5a623">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Směny">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap');
+:root {
+  --bg:#0e0f14;--surface:#161820;--surface2:#1e2030;--border:#2a2d3e;
+  --accent:#f5a623;--green:#3ecf8e;--red:#e85d4a;--blue:#4a9eff;--purple:#9b59b6;
+  --text:#e8eaf0;--muted:#6b7094;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Barlow Condensed',sans-serif;min-height:100vh;padding:20px 16px 60px;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(245,166,35,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(245,166,35,.025) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;z-index:0;}
+.app{position:relative;z-index:1;max-width:900px;margin:0 auto;}
+h1{font-size:2.1rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+h1 span{color:var(--accent);}
+.subtitle{font-size:.82rem;color:var(--muted);letter-spacing:.07em;margin-bottom:20px;}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;}
+.card-title{font-size:1.05rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.card-title em{font-style:normal;color:var(--accent);}
+.progress{font-size:.75rem;font-family:'Space Mono',monospace;color:var(--muted);margin-left:auto;}
+.progress b{color:var(--green);}
+
+/* Date picker step */
+.date-step{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;}
+.field label{display:block;font-size:.82rem;color:var(--muted);letter-spacing:.05em;margin-bottom:5px;}
+input[type=date],input[type=number]{padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--text);font-family:'Barlow Condensed',sans-serif;font-size:1rem;}
+input[type=number]{width:72px;}
+input:focus{outline:none;border-color:var(--accent);}
+.btn-setdate{padding:10px 20px;border-radius:8px;border:2px solid var(--accent);
+  background:rgba(245,166,35,.1);color:var(--accent);font-family:'Barlow Condensed',sans-serif;
+  font-size:1rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .15s;}
+.btn-setdate:hover{background:rgba(245,166,35,.2);}
+.date-hint{font-size:.75rem;color:var(--muted);font-family:'Space Mono',monospace;margin-top:8px;line-height:1.5;}
+
+/* Info */
+.info{background:rgba(245,166,35,.07);border:1px solid rgba(245,166,35,.2);border-radius:8px;
+  padding:11px 14px;font-size:.82rem;line-height:1.65;color:var(--text);margin-bottom:16px;display:none;}
+.info b{color:var(--accent);}
+
+/* Calendar input grid */
+.months-input{display:none;}
+.fill-bar{height:4px;border-radius:2px;background:var(--border);margin-bottom:16px;}
+.fill-bar-inner{height:4px;border-radius:2px;background:var(--green);transition:width .3s;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.cal-head{text-align:center;font-size:.65rem;font-weight:700;font-family:'Space Mono',monospace;color:var(--muted);padding:3px 0;}
+.cal-head.we{color:var(--accent);}
+.day-cell{border-radius:8px;border:2px solid var(--border);background:var(--surface2);
+  min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .13s;user-select:none;position:relative;}
+.day-cell.empty{background:transparent!important;border-color:transparent!important;cursor:default;}
+.day-cell:not(.empty):hover{transform:translateY(-1px);border-color:var(--accent);}
+.day-cell .dn{font-size:.58rem;color:var(--muted);font-family:'Space Mono',monospace;position:absolute;top:3px;left:0;right:0;text-align:center;}
+.day-cell .dv{font-size:1.1rem;font-weight:900;}
+.day-cell.R{border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.12);}
+.day-cell.R .dv{color:var(--accent);}
+.day-cell.O{border-color:rgba(74,158,255,.6);background:rgba(74,158,255,.12);}
+.day-cell.O .dv{color:var(--blue);}
+.day-cell.N{border-color:rgba(155,89,182,.6);background:rgba(155,89,182,.12);}
+.day-cell.N .dv{color:var(--purple);}
+.day-cell.V .dv{color:var(--muted);}
+.day-cell.we-d{border-bottom-width:3px;border-bottom-color:rgba(245,166,35,.35)!important;}
+
+/* Detect */
+.btn-detect{width:100%;padding:15px;border-radius:10px;border:2px solid var(--accent);
+  background:rgba(245,166,35,.08);color:var(--accent);font-family:'Barlow Condensed',sans-serif;
+  font-size:1.05rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;cursor:pointer;
+  transition:all .2s;margin-bottom:12px;}
+.btn-detect:hover{background:rgba(245,166,35,.16);transform:translateY(-1px);}
+.btn-detect:disabled{opacity:.35;cursor:not-allowed;transform:none;}
+.detect-result{padding:12px 16px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surface2);font-size:.85rem;font-family:'Space Mono',monospace;
+  color:var(--muted);display:none;margin-bottom:12px;line-height:1.7;}
+.detect-result.ok{border-color:rgba(62,207,142,.4);color:var(--green);}
+.detect-result.warn{border-color:rgba(245,166,35,.4);color:var(--accent);}
+
+/* Cycle editor */
+.cycle-card{display:none;}
+.cycle-outer{overflow-x:auto;padding-bottom:4px;}
+.cycle-table{display:inline-flex;flex-direction:column;gap:3px;}
+.cycle-hdr{display:flex;gap:3px;margin-left:52px;}
+.cycle-hdr-cell{width:44px;text-align:center;font-size:.62rem;font-family:'Space Mono',monospace;color:var(--muted);}
+.cycle-hdr-cell.we{color:var(--accent);}
+.cycle-week{display:flex;gap:3px;align-items:center;}
+.week-lbl{width:48px;font-size:.66rem;color:var(--muted);font-family:'Space Mono',monospace;flex-shrink:0;}
+.slot{width:44px;height:52px;border-radius:7px;border:2px solid var(--border);background:var(--surface2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .13s;user-select:none;position:relative;flex-shrink:0;}
+.slot .sn{font-size:.52rem;color:var(--muted);font-family:'Space Mono',monospace;position:absolute;top:3px;left:0;right:0;text-align:center;}
+.slot .sv{font-size:1.15rem;font-weight:900;}
+.slot.R{border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.12);} .slot.R .sv{color:var(--accent);}
+.slot.O{border-color:rgba(74,158,255,.6);background:rgba(74,158,255,.12);} .slot.O .sv{color:var(--blue);}
+.slot.N{border-color:rgba(155,89,182,.6);background:rgba(155,89,182,.12);} .slot.N .sv{color:var(--purple);}
+.slot.V .sv{color:var(--muted);}
+.slot.we-s{border-bottom:3px solid rgba(245,166,35,.35);}
+.slot:hover{transform:translateY(-2px);border-color:var(--accent);}
+.ctrl-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.mini-btn{padding:7px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface2);
+  color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s;}
+.mini-btn:hover{border-color:var(--accent);color:var(--accent);}
+.mini-btn.del:hover{border-color:var(--red);color:var(--red);}
+.gen-row{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-top:14px;}
+.btn-main{width:100%;padding:15px;border-radius:10px;border:none;background:var(--accent);color:#000;
+  font-family:'Barlow Condensed',sans-serif;font-size:1.05rem;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;cursor:pointer;transition:all .2s;margin-top:10px;}
+.btn-main:hover{background:#ffb833;transform:translateY(-1px);}
+
+/* Output */
+.months-wrap{display:none;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.83rem;font-weight:600;padding:10px 14px;
+  background:var(--surface2);border-radius:8px;border:1px solid var(--border);margin:14px 0;}
+.leg{display:flex;align-items:center;gap:5px;}
+.leg-dot{width:9px;height:9px;border-radius:2px;}
+.leg-dot.R{background:var(--accent);}.leg-dot.O{background:var(--blue);}.leg-dot.N{background:var(--purple);}.leg-dot.V{background:var(--muted);}
+.month-block{margin-bottom:22px;}
+.month-name{font-size:1.45rem;font-weight:900;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.output-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.out-head{text-align:center;font-size:.66rem;font-weight:700;color:var(--muted);font-family:'Space Mono',monospace;padding:3px 0;}
+.out-head.we{color:var(--accent);}
+.out-day{border-radius:7px;padding:5px 3px;text-align:center;border:1px solid transparent;
+  min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:transform .12s;}
+.out-day:hover{transform:translateY(-2px);}
+.out-day.empty{background:transparent!important;border-color:transparent!important;}
+.out-day.R{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.3);}
+.out-day.O{background:rgba(74,158,255,.12);border-color:rgba(74,158,255,.3);}
+.out-day.N{background:rgba(155,89,182,.12);border-color:rgba(155,89,182,.3);}
+.out-day.V{background:var(--surface2);border-color:var(--border);opacity:.45;}
+.out-day.we-d2{border-bottom:2px solid rgba(245,166,35,.28);}
+.out-num{font-size:1.2rem;font-weight:900;line-height:1;}
+.out-day.R .out-num{color:#ffd070;}.out-day.O .out-num{color:#7ec8ff;}.out-day.N .out-num{color:#c990e8;}.out-day.V .out-num{color:#8892b0;}
+.out-lbl{font-size:.58rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:2px;}
+.out-day.R .out-lbl{color:#ffd070;}.out-day.O .out-lbl{color:#7ec8ff;}.out-day.N .out-lbl{color:#c990e8;}.out-day.V .out-lbl{color:#6b7094;}
+.export-row{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
+.btn-export{padding:12px 22px;border-radius:8px;border:2px solid var(--green);background:rgba(62,207,142,.08);
+  color:var(--green);font-family:'Barlow Condensed',sans-serif;font-size:.95rem;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:all .2s;align-self:flex-start;}
+.btn-export:hover{background:rgba(62,207,142,.18);}
+.btn-export.del{border-color:var(--red);color:var(--red);background:rgba(232,93,74,.08);}
+.btn-export.del:hover{background:rgba(232,93,74,.18);}
+.saved-list{display:flex;flex-direction:column;gap:8px;}
+.saved-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;
+  background:var(--surface2);border:1px solid var(--border);flex-wrap:wrap;}
+.saved-name{font-size:.95rem;font-weight:700;letter-spacing:.04em;flex:1;min-width:120px;}
+.saved-meta{font-size:.72rem;color:var(--muted);font-family:'Space Mono',monospace;}
+.saved-btns{display:flex;gap:6px;margin-left:auto;}
+.sbtn{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;
+  font-family:'Barlow Condensed',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer;transition:all .13s;}
+.sbtn.dl{color:var(--green);border-color:rgba(62,207,142,.4);}
+.sbtn.dl:hover{background:rgba(62,207,142,.1);}
+.sbtn.rm{color:var(--red);border-color:rgba(232,93,74,.4);}
+.sbtn.rm:hover{background:rgba(232,93,74,.1);}
+.sbtn.dldel{color:var(--muted);border-color:var(--border);}
+.sbtn.dldel:hover{color:var(--red);border-color:rgba(232,93,74,.4);}
+.empty-saved{font-size:.82rem;color:var(--muted);font-family:'Space Mono',monospace;padding:10px 0;}
+</style>
+</head>
+<body>
+<div class="app">
+
+<h1>Směnový <span>Kalendář</span></h1>
+<p class="subtitle">Zadej datum → vyplň 3 měsíce → appka detekuje cyklus</p>
+
+<!-- SAVED CYCLES -->
+<div class="card" id="savedCard">
+  <div class="card-title">💾 <em>Uložené cykly</em></div>
+  <div class="saved-list" id="savedList"></div>
+</div>
+
+<!-- STEP 1: Date picker -->
+<div class="card" id="stepDate">
+  <div class="card-title">📅 <em>1.</em> Zadej datum začátku</div>
+  <div class="date-step">
+    <div class="field">
+      <label>První den pro zadávání směn</label>
+      <input type="date" id="inputStartDate">
+    </div>
+    <button class="btn-setdate" onclick="setStartDate()">Potvrdit →</button>
+  </div>
+  <p class="date-hint">Od tohoto dne se připraví 3 měsíce k vyplnění.</p>
+</div>
+
+<!-- INFO (shown after date set) -->
+<div class="info" id="infoBox">
+  <b>Jak zadat:</b> Klepni na den → přepíná <b style="color:var(--accent)">R</b> ranní → <b style="color:var(--blue)">O</b> odpolední → <b style="color:var(--purple)">N</b> noční → <b style="color:var(--muted)">·</b> volno<br>
+  Dlouhý stisk = rovnou na volno &nbsp;·&nbsp; Žlutý okraj = So/Ne
+</div>
+
+<!-- MONTH GRIDS (dynamic) -->
+<div class="months-input" id="monthsInput"></div>
+
+<!-- DETECT -->
+<button class="btn-detect" id="detectBtn" onclick="detectCycle()" disabled style="display:none">🔍 Detekovat cyklus</button>
+<div class="detect-result" id="detectResult"></div>
+
+<!-- CYCLE EDITOR -->
+<div class="card cycle-card" id="cycleCard">
+  <div class="card-title">⚙️ <em>Cyklus</em>
+    <span id="cycleTag" style="font-size:.75rem;font-family:'Space Mono',monospace;color:var(--accent);background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:3px 10px;">?</span>
+    <span style="font-size:.72rem;color:var(--muted);font-family:'Space Mono',monospace;font-weight:400;">klepni → R/O/N/volno</span>
+  </div>
+  <div class="cycle-outer"><div class="cycle-table" id="cycleTable"></div></div>
+  <div class="ctrl-row">
+    <button class="mini-btn" onclick="addDay()">+ Den</button>
+    <button class="mini-btn del" onclick="removeDay()">− Den</button>
+    <button class="mini-btn" onclick="addWeek()">+ Týden</button>
+  </div>
+  <div class="gen-row">
+    <div class="field">
+      <label>Generovat měsíců dopředu</label>
+      <input type="number" id="monthCount" value="6" min="1" max="24">
+    </div>
+  </div>
+  <button class="btn-main" onclick="generate()">⚡ Vygenerovat kalendář</button>
+</div>
+
+<!-- OUTPUT -->
+<div class="months-wrap" id="monthsWrap">
+  <div class="legend">
+    <div class="leg"><div class="leg-dot R"></div> R – Ranní 6–14h</div>
+    <div class="leg"><div class="leg-dot O"></div> O – Odpolední 14–22h</div>
+    <div class="leg"><div class="leg-dot N"></div> N – Noční 22–6h</div>
+    <div class="leg"><div class="leg-dot V"></div> Volno</div>
+  </div>
+  <div id="calContainer"></div>
+  <div class="export-row">
+    <button class="btn-export" onclick="exportIcs()">📲 Stáhnout .ics → do kalendáře</button>
+    <button class="btn-export del" onclick="exportDeleteIcs()">🗑 Mazací .ics (smaže nahrané směny)</button>
+    <button class="btn-export" style="border-color:var(--accent);color:var(--accent);background:rgba(245,166,35,.08);" onclick="saveCurrentCycle()">💾 Uložit cyklus pro pozdější mazání</button>
+    <p class="ics-hint">Android: otevři .ics → Google Kalendář nabídne import<br>iOS: otevři .ics → „Přidat všechny události"</p>
+  </div>
+</div>
+
+</div>
+<script>
+const STATES = ['V','R','O','N'];
+const LBL = {R:'Ranní',O:'Odpoled.',N:'Noční',V:'Volno'};
+const MONTHS_CS = ['Leden','Únor','Březen','Duben','Květen','Červen','Červenec','Srpen','Září','Říjen','Listopad','Prosinec'];
+const DOW_CS = ['Ne','Po','Út','St','Čt','Pá','So'];
+
+const data = {};
+let inputMonths = []; // [{y, m}] — 3 months from chosen date
+let cycleStartDate = null; // first day of first input month
+let cycle = [];
+let generated = [];
+
+// ── Step 1: set start date ────────────────────────────────────
+function setStartDate() {
+  const val = document.getElementById('inputStartDate').value;
+  if (!val) return;
+
+  // Build 3 months starting from the month of the chosen date
+  const d = new Date(val + 'T00:00:00');
+  let y = d.getFullYear(), m = d.getMonth() + 1; // 1-indexed month
+
+  inputMonths = [];
+  for (let i = 0; i < 3; i++) {
+    inputMonths.push({y, m});
+    m++; if (m > 12) { m = 1; y++; }
+  }
+
+  // cycleStartDate = first day of first month
+  cycleStartDate = new Date(inputMonths[0].y, inputMonths[0].m - 1, 1);
+
+  // Render grids
+  renderInputMonths();
+
+  document.getElementById('infoBox').style.display = 'block';
+  document.getElementById('detectBtn').style.display = 'block';
+  document.getElementById('stepDate').style.borderColor = 'var(--green)';
+}
+
+// ── Render the 3 month input grids ────────────────────────────
+function renderInputMonths() {
+  const wrap = document.getElementById('monthsInput');
+  wrap.innerHTML = '';
+  wrap.style.display = 'block';
+
+  inputMonths.forEach(({y, m}, mi) => {
+    const cardId = `icard-${mi}`;
+    const gridId = `igrid-${mi}`;
+    const progId = `iprog-${mi}`;
+    const barId  = `ibar-${mi}`;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = cardId;
+    card.innerHTML = `
+      <div class="card-title">📅 <em>${MONTHS_CS[m-1]} ${y}</em>
+        <span class="progress" id="${progId}"></span>
+      </div>
+      <div class="fill-bar"><div class="fill-bar-inner" id="${barId}" style="width:0%"></div></div>
+      <div class="cal-grid" id="${gridId}"></div>`;
+    wrap.appendChild(card);
+
+    buildGrid(y, m, gridId, progId, barId);
+  });
+}
+
+// ── Build one month grid ──────────────────────────────────────
+function buildGrid(year, month, gridId, progId, barId) {
+  const grid = document.getElementById(gridId);
+  grid.innerHTML = '';
+  DOW_CS.forEach((d,i) => {
+    const h = document.createElement('div');
+    h.className = 'cal-head' + (i===0||i===6?' we':'');
+    h.textContent = d; grid.appendChild(h);
+  });
+
+  const dim = new Date(year, month, 0).getDate();
+  const firstDow = new Date(year, month-1, 1).getDay();
+
+  for (let i = 0; i < firstDow; i++) {
+    const e = document.createElement('div'); e.className = 'day-cell empty'; grid.appendChild(e);
+  }
+
+  for (let d = 1; d <= dim; d++) {
+    const key = `${year}-${month}-${d}`;
+    const dow = new Date(year, month-1, d).getDay();
+    const isWe = dow===0||dow===6;
+    const cell = document.createElement('div');
+    const v = data[key] || null;
+    cell.className = `day-cell ${v||'V'}${isWe?' we-d':''}`;
+    if (!v) cell.style.opacity = '.4';
+    cell.innerHTML = `<span class="dn">${d}</span><span class="dv">${v&&v!=='V'?v:'·'}</span>`;
+
+    cell.onclick = () => {
+      const cur = data[key] || null;
+      data[key] = STATES[cur ? (STATES.indexOf(cur)+1)%STATES.length : 1];
+      buildGrid(year, month, gridId, progId, barId);
+      updateDetectBtn();
+    };
+    let pt;
+    cell.addEventListener('pointerdown', () => { pt = setTimeout(() => { data[key]='V'; buildGrid(year,month,gridId,progId,barId); updateDetectBtn(); }, 500); });
+    cell.addEventListener('pointerup',   () => clearTimeout(pt));
+    cell.addEventListener('pointercancel', () => clearTimeout(pt));
+    grid.appendChild(cell);
+  }
+
+  const filled = Array.from({length:dim}, (_,i) => data[`${year}-${month}-${i+1}`]).filter(Boolean).length;
+  document.getElementById(progId).innerHTML = `<b>${filled}</b>/${dim} dní`;
+  document.getElementById(barId).style.width = (filled/dim*100)+'%';
+}
+
+// ── Update detect button ──────────────────────────────────────
+function updateDetectBtn() {
+  const total = inputMonths.reduce((s,{y,m}) => s + new Date(y,m,0).getDate(), 0);
+  const filled = Object.keys(data).length;
+  const pct = Math.round(filled/total*100);
+  const btn = document.getElementById('detectBtn');
+  btn.disabled = filled < total * 0.5;
+  btn.textContent = `🔍 Detekovat cyklus (${pct}% zadáno)`;
+}
+
+// ── Detect cycle ──────────────────────────────────────────────
+function detectCycle() {
+  // Build flat array over all 3 input months
+  const flat = [];
+  inputMonths.forEach(({y,m}) => {
+    const dim = new Date(y,m,0).getDate();
+    for (let d = 1; d <= dim; d++) flat.push(data[`${y}-${m}-${d}`] || 'V');
+  });
+
+  const resultEl = document.getElementById('detectResult');
+  resultEl.style.display = 'block';
+
+  let bestLen = null, bestScore = 0;
+  for (let len = 7; len <= 35; len++) {
+    const candidate = flat.slice(0, len);
+    let matches = 0;
+    for (let i = 0; i < flat.length; i++) {
+      if (flat[i] === candidate[i % len]) matches++;
+    }
+    const score = matches / flat.length;
+    if (score > bestScore) { bestScore = score; bestLen = len; }
+  }
+
+  cycle = flat.slice(0, bestLen || 28);
+
+  if (bestScore >= 0.75) {
+    resultEl.className = 'detect-result ok';
+    resultEl.innerHTML = `✓ Nalezen cyklus <b>${bestLen} dní</b> · shoda <b>${Math.round(bestScore*100)}%</b><br>Zkontroluj a případně oprav níže.`;
+  } else {
+    resultEl.className = 'detect-result warn';
+    resultEl.innerHTML = `⚠ Čistý vzorec nenalezen (shoda ${Math.round(bestScore*100)}% pro ${bestLen} dní).<br>Uprav ručně v editoru níže.`;
+  }
+
+  document.getElementById('cycleCard').style.display = 'block';
+  renderCycleTable();
+  document.getElementById('cycleCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ── Cycle editor ──────────────────────────────────────────────
+function addDay()    { cycle.push('V'); renderCycleTable(); }
+function removeDay() { if (cycle.length > 1) { cycle.pop(); renderCycleTable(); } }
+function addWeek()   { for (let i=0;i<7;i++) cycle.push('V'); renderCycleTable(); }
+
+function renderCycleTable() {
+  const table = document.getElementById('cycleTable');
+  table.innerHTML = '';
+  document.getElementById('cycleTag').textContent = cycle.length + ' dní';
+
+  const hdr = document.createElement('div'); hdr.className = 'cycle-hdr';
+  DOW_CS.forEach((d,i) => {
+    const h = document.createElement('div');
+    h.className = 'cycle-hdr-cell' + (i===0||i===6?' we':'');
+    h.textContent = d; hdr.appendChild(h);
+  });
+  table.appendChild(hdr);
+
+  const weeks = Math.ceil(cycle.length / 7);
+  for (let w = 0; w < weeks; w++) {
+    const wrow = document.createElement('div'); wrow.className = 'cycle-week';
+    const wl = document.createElement('div'); wl.className = 'week-lbl';
+    wl.textContent = `T${w+1}·d${w*7+1}`; wrow.appendChild(wl);
+    for (let d = 0; d < 7; d++) {
+      const idx = w*7 + d;
+      if (idx >= cycle.length) { const sp=document.createElement('div');sp.style.width='44px';wrow.appendChild(sp);continue; }
+      const v = cycle[idx];
+      const slot = document.createElement('div');
+      let isWe = false;
+      if (cycleStartDate) {
+        const dt = new Date(cycleStartDate.getTime() + idx*86400000);
+        isWe = dt.getDay()===0 || dt.getDay()===6;
+      } else { isWe = d===0||d===6; }
+      slot.className = `slot ${v}${isWe?' we-s':''}`;
+      slot.innerHTML = `<span class="sn">${idx+1}</span><span class="sv">${v==='V'?'·':v}</span>`;
+      const ci = idx;
+      slot.onclick = () => { cycle[ci] = STATES[(STATES.indexOf(cycle[ci])+1)%STATES.length]; renderCycleTable(); };
+      wrow.appendChild(slot);
+    }
+    table.appendChild(wrow);
+  }
+}
+
+// ── Generate calendar ─────────────────────────────────────────
+function generate() {
+  if (!cycleStartDate || !cycle.length) return;
+  const months = parseInt(document.getElementById('monthCount').value) || 6;
+  generated = [];
+  let cy = cycleStartDate.getFullYear(), cm = cycleStartDate.getMonth();
+  for (let m = 0; m < months; m++) {
+    const dim = new Date(cy, cm+1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const date = new Date(cy, cm, d);
+      const diff = Math.round((date - cycleStartDate) / 86400000);
+      const idx = ((diff % cycle.length) + cycle.length) % cycle.length;
+      generated.push({year:cy, month:cm+1, day:d, shift:cycle[idx], dow:date.getDay()});
+    }
+    cm++; if (cm > 11) { cm = 0; cy++; }
+  }
+  renderCalendar();
+  const wrap = document.getElementById('monthsWrap');
+  wrap.style.display = 'block';
+  setTimeout(() => wrap.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+
+function renderCalendar() {
+  const c = document.getElementById('calContainer'); c.innerHTML = '';
+  const groups = {};
+  for (const s of generated) {
+    const k = s.year+'-'+s.month;
+    if (!groups[k]) groups[k] = {year:s.year, month:s.month, days:[]};
+    groups[k].days.push(s);
+  }
+  for (const k of Object.keys(groups)) {
+    const g = groups[k];
+    const block = document.createElement('div'); block.className = 'month-block';
+    block.innerHTML = `<div class="month-name">${MONTHS_CS[g.month-1]} ${g.year}</div>`;
+    const grid = document.createElement('div'); grid.className = 'output-grid';
+    DOW_CS.forEach((d,i) => {
+      const h = document.createElement('div');
+      h.className = 'out-head' + (i===0||i===6?' we':'');
+      h.textContent = d; grid.appendChild(h);
+    });
+    const firstDow = new Date(g.year, g.month-1, 1).getDay();
+    for (let i=0;i<firstDow;i++) { const e=document.createElement('div');e.className='out-day empty';grid.appendChild(e); }
+    for (const s of g.days) {
+      const cell = document.createElement('div');
+      const we = s.dow===0||s.dow===6;
+      cell.className = `out-day ${s.shift}${we?' we-d2':''}`;
+      cell.innerHTML = `<div class="out-num">${s.day}</div><div class="out-lbl">${s.shift==='V'?'volno':(LBL[s.shift]||'')}</div>`;
+      grid.appendChild(cell);
+    }
+    block.appendChild(grid); c.appendChild(block);
+  }
+}
+
+// ── Save / Load cycles ────────────────────────────────────────
+function saveCurrentCycle() {
+  if (!generated.length || !cycle.length) return;
+  const name = prompt('Název uloženého cyklu (např. "Směny jaro 2026"):');
+  if (!name) return;
+  const saves = JSON.parse(localStorage.getItem('smeny_saves') || '[]');
+  const from = generated[0];
+  const to   = generated[generated.length-1];
+  saves.push({
+    name,
+    savedAt: new Date().toISOString(),
+    cycle,
+    cycleStart: cycleStartDate.toISOString(),
+    generated: generated,
+    from: `${from.day}.${from.month}.${from.year}`,
+    to:   `${to.day}.${to.month}.${to.year}`,
+  });
+  localStorage.setItem('smeny_saves', JSON.stringify(saves));
+  renderSavedList();
+}
+
+function renderSavedList() {
+  const saves = JSON.parse(localStorage.getItem('smeny_saves') || '[]');
+  const list  = document.getElementById('savedList');
+  const card  = document.getElementById('savedCard');
+  list.innerHTML = '';
+  if (!saves.length) {
+    list.innerHTML = '<p class="empty-saved">Žádné uložené cykly. Po vygenerování klikni 💾 Uložit.</p>';
+    card.style.display = 'block';
+    return;
+  }
+  card.style.display = 'block';
+  saves.forEach((s, i) => {
+    const item = document.createElement('div');
+    item.className = 'saved-item';
+    const d = new Date(s.savedAt);
+    const dateStr = `${d.getDate()}.${d.getMonth()+1}.${d.getFullYear()}`;
+    item.innerHTML = `
+      <div>
+        <div class="saved-name">${s.name}</div>
+        <div class="saved-meta">${s.from} – ${s.to} · cyklus ${s.cycle.length} dní · uloženo ${dateStr}</div>
+      </div>
+      <div class="saved-btns">
+        <button class="sbtn dl"    onclick="dlSaved(${i})">📲 .ics</button>
+        <button class="sbtn dldel" onclick="dlSavedDel(${i})">🗑 mazací</button>
+        <button class="sbtn rm"    onclick="removeSaved(${i})">✕</button>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function dlSaved(i) {
+  const s = JSON.parse(localStorage.getItem('smeny_saves'))[i];
+  dl(buildIcs(s.generated, false), `${s.name}.ics`);
+}
+function dlSavedDel(i) {
+  const s = JSON.parse(localStorage.getItem('smeny_saves'))[i];
+  dl(buildIcs(s.generated, true), `${s.name}-SMAZAT.ics`);
+}
+function removeSaved(i) {
+  if (!confirm('Smazat uložený cyklus?')) return;
+  const saves = JSON.parse(localStorage.getItem('smeny_saves'));
+  saves.splice(i, 1);
+  localStorage.setItem('smeny_saves', JSON.stringify(saves));
+  renderSavedList();
+}
+
+function buildIcs(gen, cancel) {
+  const T = {R:'🌅 Ranní směna', O:'🌆 Odpolední směna', N:'🌙 Noční směna'};
+  const C = {R:'tangerine', O:'peacock', N:'grape'};
+  let ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Smeny//CS\r\nCALSCALE:GREGORIAN\r\n`;
+  if (cancel) ics += 'METHOD:CANCEL\r\n';
+  ics += 'X-WR-CALNAME:Směny\r\n';
+  const p = n => String(n).padStart(2,'0');
+  for (const s of gen) {
+    if (!T[s.shift]) continue;
+    const ds  = `${s.year}${p(s.month)}${p(s.day)}`;
+    const nx  = new Date(s.year, s.month-1, s.day+1);
+    const eds = `${nx.getFullYear()}${p(nx.getMonth()+1)}${p(nx.getDate())}`;
+    ics += `BEGIN:VEVENT\r\nUID:${ds}-${s.shift}@smeny\r\n`;
+    ics += `DTSTAMP:${new Date().toISOString().replace(/[-:.]/g,'').slice(0,15)}Z\r\n`;
+    ics += `DTSTART;VALUE=DATE:${ds}\r\nDTEND;VALUE=DATE:${eds}\r\n`;
+    ics += `SUMMARY:${T[s.shift]}\r\n`;
+    if (!cancel) ics += `COLOR:${C[s.shift]}\r\n`;
+    if (cancel)  ics += `STATUS:CANCELLED\r\nSEQUENCE:1\r\n`;
+    ics += `END:VEVENT\r\n`;
+  }
+  ics += 'END:VCALENDAR\r\n';
+  return ics;
+}
+
+function exportIcs()       { dl(buildIcs(generated, false), 'smeny.ics'); }
+function exportDeleteIcs() { dl(buildIcs(generated, true),  'smeny-SMAZAT.ics'); }
+
+function dl(content, filename) {
+  const a = document.createElement('a');
+  a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(content);
+  a.download = filename; a.click();
+}
+
+renderSavedList();
+
+// Service Worker registrace (PWA offline)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .catch(err => console.log('SW error:', err));
+  });
+}
+</script>
+</body>
+</html>
