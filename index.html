@@ -63,14 +63,14 @@ input:focus{outline:none;border-color:var(--accent);}
 .day-cell.empty{background:transparent!important;border-color:transparent!important;cursor:default;}
 .day-cell:not(.empty):hover{transform:translateY(-1px);border-color:var(--accent);}
 .day-cell .dn{font-size:.58rem;color:var(--muted);font-family:'Space Mono',monospace;position:absolute;top:3px;left:0;right:0;text-align:center;}
-.day-cell .dv{font-size:1.1rem;font-weight:900;}
+.day-cell .dv{font-size:1.1rem;font-weight:900;color:#ffffff;}
 .day-cell.R{border-color:rgba(245,166,35,.6);background:rgba(245,166,35,.12);}
-.day-cell.R .dv{color:var(--accent);}
+.day-cell.R .dv{color:#ffe89a;}
 .day-cell.O{border-color:rgba(74,158,255,.6);background:rgba(74,158,255,.12);}
-.day-cell.O .dv{color:var(--blue);}
+.day-cell.O .dv{color:#a8d8ff;}
 .day-cell.N{border-color:rgba(155,89,182,.6);background:rgba(155,89,182,.12);}
-.day-cell.N .dv{color:var(--purple);}
-.day-cell.V .dv{color:var(--muted);}
+.day-cell.N .dv{color:#deb0f5;}
+.day-cell.V .dv{color:#9aa3c0;}
 .day-cell.we-d{border-bottom-width:3px;border-bottom-color:rgba(245,166,35,.35)!important;}
 
 /* Detect */
@@ -138,10 +138,10 @@ input:focus{outline:none;border-color:var(--accent);}
 .out-day.N{background:rgba(155,89,182,.12);border-color:rgba(155,89,182,.3);}
 .out-day.V{background:var(--surface2);border-color:var(--border);opacity:.45;}
 .out-day.we-d2{border-bottom:2px solid rgba(245,166,35,.28);}
-.out-num{font-size:1.2rem;font-weight:900;line-height:1;}
-.out-day.R .out-num{color:#ffd070;}.out-day.O .out-num{color:#7ec8ff;}.out-day.N .out-num{color:#c990e8;}.out-day.V .out-num{color:#8892b0;}
+.out-num{font-size:1.2rem;font-weight:900;line-height:1;color:#ffffff;}
+.out-day.V .out-num{color:#9aa3c0;}
 .out-lbl{font-size:.58rem;font-weight:700;letter-spacing:.02em;text-transform:uppercase;margin-top:2px;}
-.out-day.R .out-lbl{color:#ffd070;}.out-day.O .out-lbl{color:#7ec8ff;}.out-day.N .out-lbl{color:#c990e8;}.out-day.V .out-lbl{color:#6b7094;}
+.out-day.R .out-lbl{color:#ffe89a;}.out-day.O .out-lbl{color:#a8d8ff;}.out-day.N .out-lbl{color:#deb0f5;}.out-day.V .out-lbl{color:#6b7094;}
 .export-row{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px;}
 .btn-export{padding:12px 22px;border-radius:8px;border:2px solid var(--green);background:rgba(62,207,142,.08);
   color:var(--green);font-family:'Barlow Condensed',sans-serif;font-size:.95rem;font-weight:700;
@@ -237,7 +237,9 @@ input:focus{outline:none;border-color:var(--accent);}
   <div class="export-row">
     <button class="btn-export" onclick="exportIcs()">📲 Stáhnout .ics → do kalendáře</button>
     <button class="btn-export del" onclick="exportDeleteIcs()">🗑 Mazací .ics (smaže nahrané směny)</button>
-    <button class="btn-export" style="border-color:var(--accent);color:var(--accent);background:rgba(245,166,35,.08);" onclick="saveCurrentCycle()">💾 Uložit cyklus pro pozdější mazání</button>
+    <button class="btn-export" style="border-color:var(--accent);color:var(--accent);background:rgba(245,166,35,.08);" onclick="saveCurrentCycle()">💾 Uložit cyklus</button>
+    <button class="btn-export" style="border-color:var(--blue);color:var(--blue);background:rgba(74,158,255,.08);" onclick="addNextMonth()">+ Přidat další měsíc a zpřesnit cyklus</button>
+    <button class="btn-export" style="border-color:var(--muted);color:var(--muted);" onclick="newCycle()">↺ Nový cyklus</button>
     <p class="ics-hint">Android: otevři .ics → Google Kalendář nabídne import<br>iOS: otevři .ics → „Přidat všechny události"</p>
   </div>
 </div>
@@ -258,44 +260,51 @@ let generated = [];
 // ── Step 1: set start date ────────────────────────────────────
 function setStartDate() {
   const val = document.getElementById('inputStartDate').value;
-  if (!val) return;
+  if (!val) { alert('Nejdřív vyber datum.'); return; }
 
-  // Build 3 months starting from the month of the chosen date
   const d = new Date(val + 'T00:00:00');
-  let y = d.getFullYear(), m = d.getMonth() + 1; // 1-indexed month
+  let y = d.getFullYear(), m = d.getMonth() + 1;
 
   inputMonths = [];
-  for (let i = 0; i < 3; i++) {
-    inputMonths.push({y, m});
-    m++; if (m > 12) { m = 1; y++; }
-  }
+  inputMonths.push({y, m});   // jen 1 měsíc na začátek
 
-  // cycleStartDate = first day of first month
   cycleStartDate = new Date(inputMonths[0].y, inputMonths[0].m - 1, 1);
+
+  // Button feedback
+  const btn = document.querySelector('.btn-setdate');
+  btn.textContent = '✓ Nastaveno';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
 
   // Render grids
   renderInputMonths();
 
   document.getElementById('infoBox').style.display = 'block';
   document.getElementById('detectBtn').style.display = 'block';
-  document.getElementById('stepDate').style.borderColor = 'var(--green)';
+  document.getElementById('stepDate').style.borderColor = 'rgba(62,207,142,.6)';
+
+  // Scroll to first month
+  setTimeout(() => {
+    document.getElementById('monthsInput').scrollIntoView({behavior:'smooth', block:'start'});
+  }, 100);
 }
 
-// ── Render the 3 month input grids ────────────────────────────
+// ── Render the month input grids (append-only) ───────────────
 function renderInputMonths() {
   const wrap = document.getElementById('monthsInput');
-  wrap.innerHTML = '';
   wrap.style.display = 'block';
 
+  // Only render months not yet rendered
   inputMonths.forEach(({y, m}, mi) => {
-    const cardId = `icard-${mi}`;
+    if (document.getElementById(`icard-${mi}`)) return; // already rendered
+
     const gridId = `igrid-${mi}`;
     const progId = `iprog-${mi}`;
     const barId  = `ibar-${mi}`;
 
     const card = document.createElement('div');
     card.className = 'card';
-    card.id = cardId;
+    card.id = `icard-${mi}`;
     card.innerHTML = `
       <div class="card-title">📅 <em>${MONTHS_CS[m-1]} ${y}</em>
         <span class="progress" id="${progId}"></span>
@@ -332,7 +341,7 @@ function buildGrid(year, month, gridId, progId, barId) {
     const cell = document.createElement('div');
     const v = data[key] || null;
     cell.className = `day-cell ${v||'V'}${isWe?' we-d':''}`;
-    if (!v) cell.style.opacity = '.4';
+    if (!v) cell.style.opacity = '.7';
     cell.innerHTML = `<span class="dn">${d}</span><span class="dv">${v&&v!=='V'?v:'·'}</span>`;
 
     cell.onclick = () => {
@@ -497,7 +506,26 @@ function renderCalendar() {
   }
 }
 
-// ── Save / Load cycles ────────────────────────────────────────
+// ── Add next month ────────────────────────────────────────────
+function addNextMonth() {
+  const last = inputMonths[inputMonths.length - 1];
+  let y = last.y, m = last.m + 1;
+  if (m > 12) { m = 1; y++; }
+  inputMonths.push({y, m});
+  renderInputMonths();
+
+  // Scroll to the new month card
+  setTimeout(() => {
+    const newCard = document.getElementById(`icard-${inputMonths.length - 1}`);
+    if (newCard) newCard.scrollIntoView({behavior:'smooth', block:'start'});
+  }, 100);
+
+  // Show detect button again
+  document.getElementById('detectBtn').style.display = 'block';
+  updateDetectBtn();
+}
+
+
 function saveCurrentCycle() {
   if (!generated.length || !cycle.length) return;
   const name = prompt('Název uloženého cyklu (např. "Směny jaro 2026"):');
@@ -540,12 +568,64 @@ function renderSavedList() {
         <div class="saved-meta">${s.from} – ${s.to} · cyklus ${s.cycle.length} dní · uloženo ${dateStr}</div>
       </div>
       <div class="saved-btns">
+        <button class="sbtn" style="color:var(--accent);border-color:rgba(245,166,35,.4);" onclick="openSaved(${i})">📂 Otevřít</button>
         <button class="sbtn dl"    onclick="dlSaved(${i})">📲 .ics</button>
         <button class="sbtn dldel" onclick="dlSavedDel(${i})">🗑 mazací</button>
         <button class="sbtn rm"    onclick="removeSaved(${i})">✕</button>
       </div>`;
     list.appendChild(item);
   });
+}
+
+function openSaved(i) {
+  const s = JSON.parse(localStorage.getItem('smeny_saves'))[i];
+  // Load into current state
+  generated = s.generated;
+  cycle = s.cycle;
+  cycleStartDate = new Date(s.cycleStart);
+
+  // Show calendar
+  renderCalendar();
+  const wrap = document.getElementById('monthsWrap');
+  wrap.style.display = 'block';
+
+  // Show cycle editor
+  document.getElementById('cycleCard').style.display = 'block';
+  renderCycleTable();
+
+  // Scroll to output
+  setTimeout(() => wrap.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+}
+
+function newCycle() {
+  if (!confirm('Začít nový cyklus? Zadaná data a vygenerovaný kalendář se smažou.')) return;
+
+  // Reset state
+  Object.keys(data).forEach(k => delete data[k]);
+  inputMonths = [];
+  cycle = [];
+  generated = [];
+  cycleStartDate = null;
+
+  // Reset UI
+  document.getElementById('monthsInput').innerHTML = '';
+  document.getElementById('monthsInput').style.display = 'none';
+  document.getElementById('monthsWrap').style.display = 'none';
+  document.getElementById('cycleCard').style.display = 'none';
+  document.getElementById('detectResult').style.display = 'none';
+  document.getElementById('detectBtn').style.display = 'none';
+  document.getElementById('infoBox').style.display = 'none';
+
+  // Reset date step
+  const btn = document.querySelector('.btn-setdate');
+  btn.textContent = 'Potvrdit →';
+  btn.style.borderColor = '';
+  btn.style.color = '';
+  document.getElementById('inputStartDate').value = '';
+  document.getElementById('stepDate').style.borderColor = '';
+
+  // Scroll to top
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function dlSaved(i) {
@@ -599,11 +679,11 @@ function dl(content, filename) {
 
 renderSavedList();
 
-// Service Worker registrace (PWA offline)
-if ('serviceWorker' in navigator) {
+// Service Worker (PWA offline) — pouze na vlastní doméně
+if ('serviceWorker' in navigator && location.hostname !== 'www.claudeusercontent.com') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .catch(err => console.log('SW error:', err));
+      .catch(() => {});
   });
 }
 </script>
